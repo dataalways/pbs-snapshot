@@ -1,0 +1,30 @@
+[project]
+name = "pbs-snapshot"
+version = "0.0.0"
+dependencies = [
+  "cryo~=0.3.2",
+  "maturin~=1.1",
+  "pandas~=2.2",
+  "polars~=0.20.31",
+  "pyarrow",
+  "requests~=2.31",
+  "urllib3",
+]
+requires-python = ">= 3.12"
+authors = [
+  {name = "Data Always", email = "data.always@protonmail.com" },
+]
+description = "Take a simplistic snapshot of PBS on Ethereum"
+readme = "README.md"
+license = { file = "LICENSE.txt" }
+keywords = [ "Ethereum", "MEV", "PBS" ]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python 3",
+  "Programming Language :: Python 3.12",
+]
+
+[project.urls]
+Repository = "https://github.com/dataalways/pbs-snapshot"

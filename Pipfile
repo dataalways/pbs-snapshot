@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+cryo = "~=0.3.2"
+maturin = "~=1.1"
+pandas = "~=2.2"
+polars = "~=0.20.31"
+pyarrow = "*"
+requests = "~=2.31"
+urllib3 = "*"
+
+[requires]
+python_version = "3.12"
