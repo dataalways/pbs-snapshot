@@ -10,7 +10,7 @@ pandas = "~=2.2"
 polars = "~=0.20.31"
 pyarrow = "*"
 requests = "~=2.31"
-urllib3 = "*"
+urllib3 = ">=2.2.2"
 
 [requires]
 python_version = "3.12"
