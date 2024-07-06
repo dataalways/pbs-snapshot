@@ -496,12 +496,16 @@ def main(
     df_slots = df_slots.sort_values(by="slot")
     report.n_payloads_delivered_by_relay = dict(df_slots["relay"].value_counts())
 
-    # Treat bloXroute Max Profit and bloXroute Regulated relays as one relay
-    df_slots.loc[
+    # Treat bloXroute Max Profit and bloXroute Regulated relays as one relay when computing payloads delivered by relay
+    df_slots_bloxroute_dedup = df_slots.copy()
+    df_slots_bloxroute_dedup.loc[
         df_slots["relay"].isin(["bloxroute_max_profit", "bloxroute_regulated"]), "relay"
     ] = "bloxroute"
-    df_slots = df_slots.drop_duplicates(subset=["slot", "relay"], keep="first")
-    df_slots_bloxroute_dedup = df_slots.drop_duplicates(subset=["slot"], keep=False)
+    df_slots_bloxroute_dedup = (
+        df_slots_bloxroute_dedup
+            .drop_duplicates(subset=["slot", "relay"], keep="first")
+            .drop_duplicates(subset=["slot"], keep=False)
+    )
     report.n_payloads_delivered_by_relay_bloxroute_dedup = dict(
         df_slots_bloxroute_dedup["relay"].value_counts()
     )
