@@ -6,12 +6,12 @@ through the MEV supply chain
 """
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass
 import logging
 import os
 from pathlib import Path
 import time
-from typing import Optional
+from typing import Any, Mapping, Optional, Type, TypeVar
 import urllib3
 
 import cryo
@@ -80,6 +80,19 @@ class RestApiClient:
         )
 
 
+T = TypeVar("T")
+
+
+def mapping_to_dataclass(m: Mapping[str, Any], d: Type[T]) -> T:
+    """
+    Transform a mapping from strings to objects into a data class
+    """
+    if not is_dataclass(d):
+        raise TypeError(f"{d} is not a data class")
+    fields = d.__dataclass_fields__
+    return d(**{f: fields[f].type(m[f]) if m[f] is not None else None for f in fields})
+
+
 @dataclass
 class BidTraceV2:
     slot: int
@@ -113,22 +126,7 @@ class MevBoostRelayDataClientV1(RestApiClient):
         r = self._get(endpoint, params)
         if r.status_code != 200:
             return [], r.status_code
-        return [
-            BidTraceV2(
-                slot=int(bt["slot"]),
-                parent_hash=bt["parent_hash"],
-                block_hash=bt["block_hash"],
-                builder_pubkey=bt["builder_pubkey"],
-                proposer_pubkey=bt["proposer_pubkey"],
-                proposer_fee_recipient=bt["proposer_fee_recipient"],
-                gas_limit=int(bt["gas_limit"]),
-                gas_used=int(bt["gas_used"]),
-                value=bt["value"],
-                block_number=int(bt["block_number"]),
-                num_tx=int(bt["num_tx"]),
-            )
-            for bt in r.json()
-        ], r.status_code
+        return [mapping_to_dataclass(bt, BidTraceV2) for bt in r.json()], r.status_code
 
 
 def get_data_for_relay(
@@ -232,45 +230,7 @@ class BeaconChainEpochClientV1(RestApiClient):
         if r.status_code != 200:
             return [], r.status_code
         return [
-            BeaconChainApiSlotResponseV1(
-                attestationscount=int(s["attestationscount"]),
-                attesterslashingscount=int(s["attesterslashingscount"]),
-                blockroot=s["blockroot"],
-                depositscount=int(s["depositscount"]),
-                epoch=int(s["epoch"]),
-                eth1data_blockhash=s["eth1data_blockhash"],
-                eth1data_depositcount=int(s["eth1data_depositcount"]),
-                eth1data_depositroot=s["eth1data_depositroot"],
-                exec_base_fee_per_gas=int(s["exec_base_fee_per_gas"]),
-                exec_block_hash=s["exec_block_hash"],
-                exec_block_number=int(s["exec_block_number"]),
-                exec_extra_data=s["exec_extra_data"],
-                exec_fee_recipient=s["exec_fee_recipient"],
-                exec_gas_limit=int(s["exec_gas_limit"]),
-                exec_gas_used=int(s["exec_gas_used"]),
-                exec_logs_bloom=s["exec_logs_bloom"],
-                exec_parent_hash=s["exec_parent_hash"],
-                exec_random=s["exec_random"],
-                exec_receipts_root=s["exec_receipts_root"],
-                exec_state_root=s["exec_state_root"],
-                exec_timestamp=int(s["exec_timestamp"]),
-                exec_transactions_count=int(s["exec_transactions_count"]),
-                graffiti=s["graffiti"],
-                graffiti_text=s["graffiti_text"],
-                parentroot=s["parentroot"],
-                proposer=int(s["proposer"]),
-                proposerslashingscount=int(s["proposerslashingscount"]),
-                randaoreveal=s["randaoreveal"],
-                signature=s["signature"],
-                slot=int(s["slot"]),
-                stateroot=s["stateroot"],
-                status=s["status"],
-                syncaggregate_bits=s["syncaggregate_bits"],
-                syncaggregate_participation=float(s["syncaggregate_participation"]),
-                syncaggregate_signature=s["syncaggregate_signature"],
-                voluntaryexitscount=int(s["voluntaryexitscount"]),
-                withdrawalcount=int(s["withdrawalcount"]),
-            )
+            mapping_to_dataclass(s, BeaconChainApiSlotResponseV1)
             for s in r.json()["data"]
         ], r.status_code
 
