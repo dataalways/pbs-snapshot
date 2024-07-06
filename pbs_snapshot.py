@@ -562,19 +562,6 @@ def main(
     block_hashes = set(df_blocks["block_hash"])
     df_missed_payloads = df_slots[~df_slots["block_hash"].isin(block_hashes)]
 
-    if export_data and not df_missed_payloads.empty:
-        min_slot_no_missed = int(df_missed_payloads["slot"].min())
-        max_slot_no_missed = int(df_missed_payloads["slot"].max())
-        try:
-            export_csv(
-                df_missed_payloads,
-                f"slots_{min_slot_no_missed}-{max_slot_no_missed}_missed",
-            )
-        except Exception as e:
-            logger.warning("unable to export missed slot data")
-            logger.warning("reason: %s: %s", e.__class__.__name__, e)
-            logger.info("continuing analysis")
-
     report.n_missed_mevboost_payloads_delivered_by_relay = dict(
         df_missed_payloads["relay"].value_counts()
     )
@@ -587,21 +574,26 @@ def main(
     missing_slots = [slot_from_timestamp(ts) for ts in missing_timestamps]
     epochs = [s // EPOCH_SIZE for s in missing_slots]
 
+    df = pd.DataFrame()
+    dfs = []
     validator_indexes_for_missed_payloads = set()
     beaconchain_client = BeaconChainEpochClientV1()
     logger.info("downloading missed slot data from beaconcha.in")
-    for epoch in epochs:
+    for epoch in set(epochs):
         epoch_data, status_code = beaconchain_client.slots_in_epoch(epoch)
         match (status_code):
             case 200:
                 pass
             case _:
                 raise RuntimeError(f"unexpected HTTP status code: {status_code}")
-        df_epoch = pd.DataFrame(epoch_data)
+        df = pd.DataFrame(epoch_data)
+        dfs.append(df)
         validator_indexes_for_missed_payloads.update(
-            set(df_epoch[df_epoch["status"] != "1"]["proposer"])
+            set(df[df["status"] != "1"]["proposer"])
         )
         time.sleep(1 / BEACONCHAIN_RATE_LIMIT)
+
+    df_epochs = pd.concat(dfs) if dfs else pd.DataFrame()
 
     n_proposers_with_missed_slots = len(validator_indexes_for_missed_payloads)
     report.n_proposers_with_missed_slots = n_proposers_with_missed_slots
@@ -609,6 +601,39 @@ def main(
     validator_indexes = pd.read_parquet(
         PUBKEY_INDEXES_FILE, columns=["entity", "validator_index"]
     )
+
+    # Enrich each missed payload with the identity of the corresponding proposer
+    df_missed_payloads_enriched = pd.DataFrame()
+    if not df_missed_payloads.empty and not df_epochs.empty:
+        df_missed_payloads_enriched = (
+            df_missed_payloads.join(
+                df_epochs[["slot", "proposer"]].set_index("slot"),
+                on="slot",
+                how="left",
+            )
+            .join(
+                validator_indexes.set_index("validator_index"),
+                on="proposer",
+                how="left",
+            )
+            .drop(
+                columns=["proposer"],
+            )
+        )
+
+    if export_data and not df_missed_payloads_enriched.empty:
+        min_slot_no_missed = int(df_missed_payloads_enriched["slot"].min())
+        max_slot_no_missed = int(df_missed_payloads_enriched["slot"].max())
+        try:
+            export_csv(
+                df_missed_payloads_enriched,
+                f"slots_{min_slot_no_missed}-{max_slot_no_missed}_missed",
+            )
+        except Exception as e:
+            logger.warning("unable to export missed slot data")
+            logger.warning("reason: %s: %s", e.__class__.__name__, e)
+            logger.info("continuing analysis")
+
     tagged_proposers = validator_indexes[
         validator_indexes["validator_index"].isin(validator_indexes_for_missed_payloads)
     ]
