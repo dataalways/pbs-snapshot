@@ -62,6 +62,17 @@ def slot_from_timestamp(ts: int) -> int:
     return (ts - SLOT0_TIME) // SLOT_INTERVAL
 
 
+def timestamp_from_slot(slot: int) -> int:
+    """
+    Calculates the Unix time corresponding to a slot
+    """
+    if slot < 0:
+        raise ValueError(
+            f"expected nonnegative slot number"
+        )
+    return SLOT0_TIME + SLOT_INTERVAL * slot
+
+
 class RestApiClient:
     """
     Basic building block for implementing unauthenticated REST API clients
@@ -246,6 +257,7 @@ class Report:
         self.max_block_number = None
         self.n_payloads_delivered_by_relay = {}
         self.n_payloads_delivered_by_relay_bloxroute_dedup = {}
+        self.no_block_data = False
         self.mev_block_fraction = None
         self.missed_slot_fraction = None
         self.n_missed_mevboost_payloads_delivered_by_relay = {}
@@ -285,6 +297,11 @@ class Report:
                     f"{k}: {v}"
                     for k, v in self.n_payloads_delivered_by_relay_bloxroute_dedup.items()
                 )
+            )
+
+        if self.no_block_data:
+            result.append(
+                "No block data was available."
             )
 
         if self.mev_block_fraction is not None:
@@ -452,7 +469,7 @@ def main(
         dfs.append(df)
 
     df_slots = pd.concat(dfs)
-    df_slots = df_slots[df_slots["slot"] > df_slots["slot"].max() - lookback]
+    df_slots = df_slots[df_slots["slot"] > max_slot - lookback]
     df_slots = df_slots.sort_values(by="slot")
     report.n_payloads_delivered_by_relay = dict(df_slots["relay"].value_counts())
 
@@ -470,19 +487,39 @@ def main(
         df_slots_bloxroute_dedup["relay"].value_counts()
     )
 
+    max_slot_actual = df_slots["slot"].max()
+    min_slot_actual = df_slots["slot"].min()
+
+    # Relays return data for only slots for which proposers chose not to build their own blocks.
+    # However, this data alone may not fill the lookback interval.
+    # To account for locally built blocks at the edges of the interval, we must ask cryo for information about additional blocks.
+    # p and q hold the offsets with which we will extend the block interval.
+    q = max_slot - max_slot_actual
+    p = lookback - q - (max_slot_actual - min_slot_actual + 1)
+
     logger.info("downloading block data from RPC endpoint")
     min_block_no, max_block_no = (
         df_slots["block_number"].min(),
         df_slots["block_number"].max(),
     )
     df_blocks = cryo_collect_blocks(
-        blocks=[f"{min_block_no}:{max_block_no + 1}"],
+        blocks=[f"{min_block_no - p}:{max_block_no + q + 1}"],
         rpc=rpc,
         requests_per_second=requests_per_second,
     )
 
+    # Trim blocks corresponding to slots outside the interval of interest
+    min_slot_ts_adjusted = timestamp_from_slot(min_slot_actual - p)
+    max_slot_ts_adjusted = timestamp_from_slot(max_slot_actual + q)
+    block_mask = (min_slot_ts_adjusted <= df_blocks["timestamp"]) & (df_blocks["timestamp"] <= max_slot_ts_adjusted)
+    df_blocks_trimmed = df_blocks[block_mask]
+
+    if df_blocks_trimmed.empty:
+        report.no_block_data = True
+        return
+
     if export_data:
-        df_blocks_enriched = df_blocks.join(
+        df_blocks_enriched = df_blocks_trimmed.join(
             df_slots.set_index("block_hash"),
             on="block_hash",
             how="left",
@@ -507,29 +544,29 @@ def main(
 
     # Compute fraction of MEV-Boost blocks
     mev_blocks = df_slots.drop_duplicates(subset="block_number", keep="first")
-    mev_block_fraction = len(mev_blocks) / len(df_blocks)
+    mev_block_fraction = len(mev_blocks) / len(df_blocks_trimmed)
     report.mev_block_fraction = mev_block_fraction
 
     # Compute fraction of missed slots
-    df_blocks["block_time"] = df_blocks["timestamp"].diff(1)
+    df_blocks_trimmed["block_time"] = df_blocks_trimmed["timestamp"].diff(1)
     missed_slots = (
-        sum(df_blocks["block_time"].dropna() - SLOT_INTERVAL) // SLOT_INTERVAL
+        sum(df_blocks_trimmed["block_time"].dropna() - SLOT_INTERVAL) // SLOT_INTERVAL
     )
     missed_slot_fraction = missed_slots / lookback
     report.missed_slot_fraction = missed_slot_fraction
 
     # Count payloads delivered to each proposer (possibly by more than one relay) but not included on the chain
-    block_hashes = set(df_blocks["block_hash"])
+    block_hashes = set(df_blocks_trimmed["block_hash"])
     df_missed_payloads = df_slots[~df_slots["block_hash"].isin(block_hashes)]
 
     report.n_missed_mevboost_payloads_delivered_by_relay = dict(
         df_missed_payloads["relay"].value_counts()
     )
 
-    ini_ts, fin_ts = df_blocks.iloc[0]["timestamp"], df_blocks.iloc[-1]["timestamp"]
+    ini_ts, fin_ts = df_blocks_trimmed["timestamp"].iloc[[0, -1]]
     expected_timestamps = range(ini_ts, fin_ts, SLOT_INTERVAL)
     missing_timestamps = [
-        ts for ts in expected_timestamps if ts not in set(df_blocks["timestamp"])
+        ts for ts in expected_timestamps if ts not in set(df_blocks_trimmed["timestamp"])
     ]
     missing_slots = [slot_from_timestamp(ts) for ts in missing_timestamps]
     epochs = [s // EPOCH_SIZE for s in missing_slots]
