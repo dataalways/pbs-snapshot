@@ -151,6 +151,12 @@ options:
                         Request rate for the given RPC endpoint (defaults to 2)
 ```
 
+## Special cases in the data
+
+Some relays may not return any data for some queries. This can happen when the relay was down during the period corresponding to the lookback interval or when the relay no longer has data associated with that interval. In these cases, PBS Snapshot may underestimate the MEV share.
+
+Relay data won't fill the lookback interval when there is at least one missed slot at either endpoint of the lookback interval.
+
 ## License
 
 PBS Snapshot is provided under the [MIT License](./LICENSE.txt).
