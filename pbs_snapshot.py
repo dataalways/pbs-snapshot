@@ -512,7 +512,7 @@ def main(
     min_slot_ts_adjusted = timestamp_from_slot(min_slot_actual - p)
     max_slot_ts_adjusted = timestamp_from_slot(max_slot_actual + q)
     block_mask = (min_slot_ts_adjusted <= df_blocks["timestamp"]) & (df_blocks["timestamp"] <= max_slot_ts_adjusted)
-    df_blocks_trimmed = df_blocks[block_mask]
+    df_blocks_trimmed = df_blocks[block_mask].copy()
 
     if df_blocks_trimmed.empty:
         report.no_block_data = True
@@ -548,7 +548,7 @@ def main(
     report.mev_block_fraction = mev_block_fraction
 
     # Compute fraction of missed slots
-    df_blocks_trimmed["block_time"] = df_blocks_trimmed["timestamp"].diff(1)
+    df_blocks_trimmed.loc[:, "block_time"] = df_blocks_trimmed["timestamp"].diff(1)
     missed_slots = (
         sum(df_blocks_trimmed["block_time"].dropna() - SLOT_INTERVAL) // SLOT_INTERVAL
     )
