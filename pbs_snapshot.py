@@ -34,6 +34,7 @@ MERKLE_ETH_RPC_URL = "https://eth.merkle.io"
 BEACONCHAIN_URL = "https://beaconcha.in"
 BEACONCHAIN_RATE_LIMIT = 5  # in requests per second
 
+PUBKEY_BUILDERNAME_MAPPING_FILE = Path("mapping_pubkey_builder_name.csv")
 PUBKEY_INDEXES_FILE = Path("proposer_indexes.parquet")
 
 RELAYS = {
@@ -472,6 +473,11 @@ def main(
     df_slots = df_slots[df_slots["slot"] > max_slot - lookback]
     df_slots = df_slots.sort_values(by="slot")
     report.n_payloads_delivered_by_relay = dict(df_slots["relay"].value_counts())
+
+    if PUBKEY_BUILDERNAME_MAPPING_FILE.exists():
+        pubkey_buildername_mapping = pd.read_csv(PUBKEY_BUILDERNAME_MAPPING_FILE, usecols=["pubkey", "builder_name"]).rename(columns={"pubkey": "builder_pubkey"})
+        logger.info("found and read mapping of builder pubkeys to names")
+        df_slots = df_slots.merge(pubkey_buildername_mapping, how="left", on="builder_pubkey")
 
     # Treat bloXroute Max Profit and bloXroute Regulated relays as one relay when computing payloads delivered by relay
     df_slots_bloxroute_dedup = df_slots.copy()
