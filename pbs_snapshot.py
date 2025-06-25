@@ -166,7 +166,7 @@ def get_data_for_relay(
                 n_retries += 1
                 time.sleep(5)
                 continue
-            case 503:
+            case 500 | 503:
                 relay_available = False
                 break
             case _:
