@@ -47,6 +47,8 @@ RELAYS = {
     "titan": "http://titanrelay.xyz",
     "eden": "https://relay.edennetwork.io",
     "manifold": "https://mainnet-relay.securerpc.com",
+    "btcs": "https://relay.btcs.com",
+    "ethgas": "https://relay.ethgas.com",
 }
 
 EXPORT_DIR = Path("export")
