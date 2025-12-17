@@ -45,7 +45,6 @@ RELAYS = {
     "aestus": "https://mainnet.aestus.live",
     "bloxroute_regulated": "https://bloxroute.regulated.blxrbdn.com",
     "titan": "http://titanrelay.xyz",
-    "eden": "https://relay.edennetwork.io",
     "manifold": "https://mainnet-relay.securerpc.com",
     "btcs": "https://relay.btcs.com",
     "ethgas": "https://relay.ethgas.com",
