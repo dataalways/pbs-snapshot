@@ -466,7 +466,7 @@ def main(
                 "relay '%s' returned no data; MEV share may be an underestimate", relay
             )
             continue
-        df = pd.DataFrame(data_for_relay)
+        df = pd.DataFrame(data_for_relay).drop_duplicates()
         df["relay"] = relay
         dfs.append(df)
 
