@@ -84,11 +84,12 @@ class RestApiClient:
         self.base_url = base_url
 
     def _get(
-        self, endpoint: str = "/", params: Optional[dict] = None
+        self, endpoint: str = "/", params: Optional[dict] = None, headers: Optional[dict] = None
     ) -> requests.Response:
         return requests.get(
             self.base_url + endpoint,
             params=params,
+            headers=headers,
             timeout=(HTTP_CONNECT_TIMEOUT, HTTP_READ_TIMEOUT),
         )
 
@@ -136,7 +137,7 @@ class MevBoostRelayDataClientV1(RestApiClient):
         """
         endpoint = self.endpoint_root + "/bidtraces/proposer_payload_delivered"
         params = {"cursor": cursor, "limit": 100}
-        r = self._get(endpoint, params)
+        r = self._get(endpoint, params=params)
         if r.status_code != 200:
             return [], r.status_code
         return [mapping_to_dataclass(bt, BidTraceV2) for bt in r.json()], r.status_code
@@ -228,9 +229,10 @@ class BeaconChainEpochClientV1(RestApiClient):
     Client to download consensus-layer information about epochs from beaconcha.in's REST API v1
     """
 
-    def __init__(self) -> None:
+    def __init__(self, key: str) -> None:
         super().__init__(BEACONCHAIN_URL)
         self.endpoint_root = "/api/v1/epoch"
+        self.key = key
 
     def slots_in_epoch(
         self, epoch: int
@@ -239,7 +241,8 @@ class BeaconChainEpochClientV1(RestApiClient):
         Get latest or finalized blocks in an epoch
         """
         endpoint = f"{self.endpoint_root}/{epoch}/slots"
-        r = self._get(endpoint)
+        headers = {"Authorization": f"Bearer {self.key}"}
+        r = self._get(endpoint, headers=headers)
         if r.status_code != 200:
             return [], r.status_code
         return [
@@ -426,6 +429,7 @@ def main(
     lookback: int,
     max_slot: Optional[int] = None,
     export_data: bool = True,
+    beaconchain_api_key: Optional[str] = None,
     logger: logging.Logger = logging.getLogger(__name__),
 ) -> None:
     latest_block = cryo_collect_blocks(
@@ -578,10 +582,13 @@ def main(
     missing_slots = [slot_from_timestamp(ts) for ts in missing_timestamps]
     epochs = [s // EPOCH_SIZE for s in missing_slots]
 
+    if not beaconchain_api_key:
+        return
+
     df = pd.DataFrame()
     dfs = []
     validator_indexes_for_missed_payloads = set()
-    beaconchain_client = BeaconChainEpochClientV1()
+    beaconchain_client = BeaconChainEpochClientV1(beaconchain_api_key)
     logger.info("downloading missed slot data from beaconcha.in")
     for epoch in set(epochs):
         epoch_data, status_code = beaconchain_client.slots_in_epoch(epoch)
@@ -682,6 +689,9 @@ def validate_rpc_url(url: urllib3.util.url.Url) -> None:
 
 
 if __name__ == "__main__":
+    beaconchain_api_key = os.getenv("BEACONCHAIN_API_KEY")
+    os.unsetenv("BEACONCHAIN_API_KEY")
+
     parser = argparse.ArgumentParser(
         prog=Path(__file__).name,
         description="Collect data for making assertions about the health of the MEV-Boost relay network",
@@ -753,6 +763,7 @@ if __name__ == "__main__":
             args.lookback,
             args.max_slot,
             not args.no_export_data,
+            beaconchain_api_key,
         )
     finally:
         print(report)
