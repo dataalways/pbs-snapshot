@@ -1,0 +1,1 @@
+The original commit message mistakenly indicated that the use of the ETH_RPC_URL environment variable is affected by CVE-2025-66418 and CVE-2025-66471. In fact, pbs_snapshot.py forwards the RPC URL (the only URL that users can set, modification of source code notwithstanding) to the cryo.collect method, to be processed by Rust crates.
