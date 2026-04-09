@@ -9,7 +9,7 @@ maturin = "~=1.1"
 pandas = "~=2.2"
 polars = "~=0.20.31"
 pyarrow = "*"
-requests = "~=2.32"
+requests = "~=2.33"
 urllib3 = "~=2.6"
 
 [requires]
