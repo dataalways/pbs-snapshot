@@ -598,7 +598,6 @@ def main(
 
     df = pd.DataFrame()
     dfs = []
-    validator_indexes_for_missed_payloads = set()
     beaconchain_client = BeaconChainEpochClientV1(beaconchain_api_key)
     logger.info("downloading missed slot data from beaconcha.in")
     for epoch in set(epochs):
@@ -610,12 +609,17 @@ def main(
                 raise RuntimeError(f"unexpected HTTP status code: {status_code}")
         df = pd.DataFrame(epoch_data)
         dfs.append(df)
-        validator_indexes_for_missed_payloads.update(
-            set(df[df["status"] != "1"]["proposer"])
-        )
         time.sleep(1 / BEACONCHAIN_RATE_LIMIT)
 
-    df_epochs = pd.concat(dfs) if dfs else pd.DataFrame()
+    df_epochs = pd.DataFrame()
+    validator_indexes_for_missed_payloads = set()
+
+    if dfs:
+        df_epochs = pd.concat(dfs)
+        df_epochs = df_epochs[df_epochs["slot"].isin(set(missing_slots))]
+        validator_indexes_for_missed_payloads = set(
+            df_epochs[df_epochs["status"] != "1"]["proposer"]
+        )
 
     n_proposers_with_missed_slots = len(validator_indexes_for_missed_payloads)
     report.n_proposers_with_missed_slots = n_proposers_with_missed_slots
