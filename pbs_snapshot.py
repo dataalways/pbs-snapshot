@@ -6,7 +6,7 @@ through the MEV supply chain
 """
 
 import argparse
-from dataclasses import dataclass, is_dataclass
+import dataclasses
 import logging
 import os
 from pathlib import Path
@@ -103,17 +103,16 @@ class RestApiClient:
 T = TypeVar("T")
 
 
-def mapping_to_dataclass(m: Mapping[str, Any], d: Type[T]) -> T:
+def dataclass_from_mapping(m: Mapping[str, Any], d: Type[T]) -> T:
     """
-    Transform a mapping from strings to objects into a data class
+    Construct an instance of a data class from a mapping of strings to objects
     """
-    if not is_dataclass(d):
+    if not dataclasses.is_dataclass(d):
         raise TypeError(f"{d} is not a data class")
-    fields = d.__dataclass_fields__
-    return d(**{f: fields[f].type(m[f]) if m[f] is not None else None for f in fields})
+    return d(**{f.name: f.type(m[f.name]) if m[f.name] is not None else None for f in dataclasses.fields(d)})
 
 
-@dataclass
+@dataclasses.dataclass
 class BidTraceV2:
     slot: int
     parent_hash: str
@@ -146,7 +145,7 @@ class MevBoostRelayDataClientV1(RestApiClient):
         r = self._get(endpoint, params=params)
         if r.status_code != 200:
             return [], r.status_code
-        return [mapping_to_dataclass(bt, BidTraceV2) for bt in r.json()], r.status_code
+        return [dataclass_from_mapping(bt, BidTraceV2) for bt in r.json()], r.status_code
 
 
 def get_data_for_relay(
@@ -193,7 +192,7 @@ def get_data_for_relay(
     return result, relay_available, rate_limited_maybe
 
 
-@dataclass
+@dataclasses.dataclass
 class BeaconChainApiSlotResponseV1:
     attestationscount: int
     attesterslashingscount: int
@@ -256,7 +255,7 @@ class BeaconChainEpochClientV1(RestApiClient):
         if r.status_code != 200:
             return [], r.status_code
         return [
-            mapping_to_dataclass(s, BeaconChainApiSlotResponseV1)
+            dataclass_from_mapping(s, BeaconChainApiSlotResponseV1)
             for s in r.json()["data"]
         ], r.status_code
 
