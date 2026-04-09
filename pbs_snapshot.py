@@ -75,6 +75,10 @@ def timestamp_from_slot(slot: int) -> int:
     return SLOT0_TIME + SLOT_INTERVAL * slot
 
 
+class RestApiClientConnectionError(Exception):
+    pass
+
+
 class RestApiClient:
     """
     Basic building block for implementing unauthenticated REST API clients
@@ -86,12 +90,15 @@ class RestApiClient:
     def _get(
         self, endpoint: str = "/", params: Optional[dict] = None, headers: Optional[dict] = None
     ) -> requests.Response:
-        return requests.get(
-            self.base_url + endpoint,
-            params=params,
-            headers=headers,
-            timeout=(HTTP_CONNECT_TIMEOUT, HTTP_READ_TIMEOUT),
-        )
+        try:
+            return requests.get(
+                self.base_url + endpoint,
+                params=params,
+                headers=headers,
+                timeout=(HTTP_CONNECT_TIMEOUT, HTTP_READ_TIMEOUT),
+            )
+        except requests.ConnectionError as e:
+            raise RestApiClientConnectionError(e)
 
 
 T = TypeVar("T")
@@ -157,7 +164,11 @@ def get_data_for_relay(
     rate_limited_maybe = False
     n_retries = 0
     while cursor > min_slot:
-        bidtraces, status_code = client.proposer_payload_delivered(cursor)
+        try:
+            bidtraces, status_code = client.proposer_payload_delivered(cursor)
+        except RestApiClientConnectionError:
+            relay_available = False
+            break
         match (status_code):
             case 200:
                 pass
