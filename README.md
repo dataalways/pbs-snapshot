@@ -1,6 +1,6 @@
 # PBS Snapshot
 
-PBS Snapshot is a command-line program written in [Python](https://www.python.org/) that delivers a simplistic snapshot of proposer/builder separation on [Ethereum](https://ethereum.org/). It runs out of the box with no authentication requirements, however for larger historic snapshots we recommend setting a custom JSON-RPC endpoint and rate limit.
+PBS Snapshot is a command-line program written in [Python](https://www.python.org/) that delivers a simplistic snapshot of proposer/builder separation on [Ethereum](https://ethereum.org/).
 
 The snapshot is created by:
 
@@ -33,6 +33,11 @@ $ pipenv install --ignore-pipfile
 
 We also provide a minimal *pyproject.toml* file for users of modern project managers such as [Rye](https://rye.astral.sh), [Hatch](https://hatch.pypa.io) and [PDM](https://pdm-project.org).
 
+## Optional authentication prerequisites
+
+- Custom JSON-RPC endpoint
+- [beaconcha.in](https://beaconcha.in/) API key for missed slot–proposer attribution
+
 ## Usage
 
 In the following examples, each command is run in a virtual environment containing the project's dependencies.
@@ -40,18 +45,19 @@ In the following examples, each command is run in a virtual environment containi
 ### Example 1: Live picture of the blockchain
 
 ```console
-(pbs-snapshot) $ ./pbs_snapshot.py
+(pbs-snapshot) $ env ETH_RPC_URL=<VALUE> BEACONCHAIN_API_KEY=<VALUE> ./pbs_snapshot.py
 ```
 
 ```
 pbs_snapshot: INFO: downloading payload delivery data from MEV-Boost relays
+pbs_snapshot: INFO: found and read mapping of builder pubkeys to names
 pbs_snapshot: INFO: downloading block data from RPC endpoint
-pbs_snapshot: INFO: writing data to 'export/slots_9275070-9275119_snapshot.csv'
+pbs_snapshot: INFO: writing data to 'export/slots_14429755-14429804_snapshot.csv'
 pbs_snapshot: INFO: downloading missed slot data from beaconcha.in
 All queried relays were available!
-Range of blocks analyzed: from 20069909 to 20069958
-Number of payloads delivered by relay: ultrasound: 30, bloxroute_max_profit: 26, bloxroute_regulated: 17, agnostic: 17, flashbots: 10, aestus: 6
-Number of payloads delivered by only one relay: bloxroute: 10, ultrasound: 10, flashbots: 3
+Range of blocks analyzed: from 25194659 to 25194708
+Number of payloads delivered by relay: ultrasound: 33, titan: 28, bloxroute_max_profit: 23, bloxroute_regulated: 14, aestus: 8, flashbots: 4, agnostic: 1
+Number of payloads delivered by only one relay: ultrasound: 13, titan: 8, bloxroute: 4
 Share of MEV-Boost blocks: 96.00%
 Share of missed slots: 0.00%
 Number of proposers that missed their slots: 0
@@ -65,6 +71,8 @@ Analysis of output:
 - Network health was nominal
 
 ### Example 2: [bloXroute BDN issues](https://gist.github.com/benhenryhunter/687299bcfe064674537dc9348d771e83) on March 27, 2024
+
+> This is a historical example.
 
 ```console
 (pbs-snapshot) $ ./pbs_snapshot.py --max-slot 8729000 --lookback 1000
@@ -96,6 +104,8 @@ Analysis of output:
 - The most likely cause of the network instability was an issue with bloXroute's relays
 
 ### Example 3: [Coinbase Outage](https://ethstaker.notion.site/Portion-of-the-network-is-offline-e08da6aab1124097888b3bdd2a3febf7) on March 8, 2024
+
+> This is a historical example.
 
 ```console
 (pbs-snapshot) $ ./pbs_snapshot.py --max-slot 8593000 --lookback 500
@@ -145,8 +155,7 @@ options:
   -m MAX_SLOT, --max-slot MAX_SLOT
                         Largest slot number to consider for which a block has been added to the chain (defaults to the latest)
   -q, --quiet           Do not log normal events
-  -r RPC, --rpc RPC     RPC endpoint from which to fetch block metadata (defaults to the value of the ETH_RPC_URL environment variable
-                        or to eth.merkle.io)
+  -r RPC, --rpc RPC     RPC endpoint from which to fetch block metadata (defaults to the value of the ETH_RPC_URL environment variable)
   -R REQUESTS_PER_SECOND, --requests-per-second REQUESTS_PER_SECOND
                         Request rate for the given RPC endpoint (defaults to 2)
 ```
@@ -156,6 +165,16 @@ options:
 Some relays may not return any data for some queries. This can happen when the relay was down during the period corresponding to the lookback interval or when the relay no longer has data associated with that interval. In these cases, PBS Snapshot may underestimate the MEV share.
 
 Relay data won't fill the lookback interval when there is at least one missed slot at either endpoint of the lookback interval.
+
+## Errata
+
+Notes containing errata are available for some commit messages. To obtain these, run the following command in the repository root:
+
+```console
+$ git fetch origin 'refs/notes/*:refs/notes/*'
+```
+
+Git will then display the errata in the commit log.
 
 ## License
 
