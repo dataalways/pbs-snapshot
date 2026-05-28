@@ -29,7 +29,7 @@ MERGE_SLOT = 4700013
 SLOT0_TIME = 1606824023  # in seconds since the Unix epoch
 SLOT_INTERVAL = 12  # in seconds
 
-MERKLE_ETH_RPC_URL = "https://eth.merkle.io"
+ETH_RPC_URL_DEFAULT = "https://eth.drpc.org"
 
 BEACONCHAIN_URL = "https://beaconcha.in"
 BEACONCHAIN_RATE_LIMIT = 5  # in requests per second
@@ -391,17 +391,17 @@ def cryo_collect_blocks(
             # a JSON-RPC error related to rate limiting. We can't prove this
             # because the exception doesn't carry information about the reason
             # for the panic (the panicking thread writes that information to
-            # stderr). In any event, we retry once with merkle if the given RPC
-            # endpoint was not already merkle.
+            # stderr). In any event, we retry once with the default endpoint
+            # if it was not already the user-provided endpoint.
             logger.warning(
                 "thread panicked possibly as a result of JSON-RPC rate limiting"
             )
-            if not rpc.startswith(MERKLE_ETH_RPC_URL):
-                logger.info("retrying download with eth.merkle.io")
+            if not rpc.startswith(ETH_RPC_URL_DEFAULT):
+                logger.info(f"retrying download with {ETH_RPC_URL_DEFAULT}")
                 result = cryo.collect(
                     "blocks",
                     blocks=blocks,
-                    rpc=MERKLE_ETH_RPC_URL,
+                    rpc=ETH_RPC_URL_DEFAULT,
                     output_format="pandas",
                     hex=True,
                     requests_per_second=2,
@@ -737,8 +737,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "-r",
         "--rpc",
-        default=os.getenv("ETH_RPC_URL") or MERKLE_ETH_RPC_URL,
-        help="RPC endpoint from which to fetch block metadata (defaults to the value of the ETH_RPC_URL environment variable or to eth.merkle.io)",
+        default=os.getenv("ETH_RPC_URL") or ETH_RPC_URL_DEFAULT,
+        help=f"RPC endpoint from which to fetch block metadata (defaults to the value of the ETH_RPC_URL environment variable or {ETH_RPC_URL_DEFAULT})",
     )
     parser.add_argument(
         "-R",
