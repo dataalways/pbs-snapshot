@@ -32,7 +32,7 @@ SLOT_INTERVAL = 12  # in seconds
 ETH_RPC_URL_DEFAULT = "https://eth.drpc.org"
 
 BEACONCHAIN_URL = "https://beaconcha.in"
-BEACONCHAIN_RATE_LIMIT = 5  # in requests per second
+BEACONCHAIN_RATE_LIMIT = 1  # in requests per second
 
 PUBKEY_BUILDERNAME_MAPPING_FILE = Path("mapping_pubkey_builder_name.csv")
 PUBKEY_INDEXES_FILE = Path("proposer_indexes.parquet")
@@ -603,6 +603,10 @@ def main(
         match (status_code):
             case 200:
                 pass
+            case 429:
+                logger.error("rate-limited by beaconcha.in")
+                logger.info("skipping attribution of proposers to missed slots")
+                return
             case _:
                 raise RuntimeError(f"unexpected HTTP status code: {status_code}")
         df = pd.DataFrame(epoch_data)
