@@ -7,8 +7,8 @@ dependencies = [
   "pandas~=2.2",
   "polars~=0.20.31",
   "pyarrow",
-  "requests~=2.31",
-  "urllib3",
+  "requests~=2.33",
+  "urllib3~=2.7",
 ]
 requires-python = ">= 3.12"
 authors = [
